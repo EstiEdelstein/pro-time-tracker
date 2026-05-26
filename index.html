@@ -116,14 +116,14 @@
 
     /* ── AVATAR ── */
     .avatar-btn {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 34px; height: 34px; border-radius: 50%;
       background: linear-gradient(135deg, var(--rose), var(--rose-dark));
-      border: 2px solid rgba(255,255,255,0.15);
-      color: white; font-size: 0.68rem; font-weight: 800;
-      cursor: pointer; font-family: 'DM Sans', sans-serif;
+      border: 2px solid rgba(255,255,255,0.25);
+      cursor: pointer; padding: 0; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
-      letter-spacing: 0.5px; transition: all 0.15s;
+      transition: all 0.15s; flex-shrink: 0;
     }
+    .avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .avatar-btn:active { transform: scale(0.94); }
 
     /* ── TABS ── */
@@ -463,7 +463,9 @@
         <button class="sync-btn" id="sync-btn" onclick="manualSync()" title="Sync">
           <span id="sync-icon-wrap" class="sync-icon-wrap"></span>
         </button>
-        <button class="avatar-btn" onclick="openAvatarSheet()" title="Account">EE</button>
+        <button class="avatar-btn" onclick="openAvatarSheet()" title="Account">
+          <img src="https://github.com/EstiEdelstein.png" alt="EE" />
+        </button>
       </div>
     </div>
   </div>
