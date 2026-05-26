@@ -559,6 +559,19 @@
   </div>
 </div>
 
+<!-- ─── CONFIRM SHEET ─── -->
+<div class="action-sheet-overlay" id="confirm-sheet" onclick="closeConfirmSheet(event)">
+  <div class="action-sheet">
+    <span class="action-sheet-handle"></span>
+    <div class="action-sheet-title" id="confirm-sheet-title">Are you sure?</div>
+    <button class="action-sheet-btn danger" id="confirm-sheet-ok">
+      <span class="btn-icon" id="confirm-sheet-icon"></span>
+      <span id="confirm-sheet-label">Delete</span>
+    </button>
+    <button class="action-sheet-cancel" onclick="closeConfirmSheet()">Cancel</button>
+  </div>
+</div>
+
 <!-- ─── SETTINGS MODAL ─── -->
 <div class="modal-overlay" id="modal-settings" onclick="closeSettings(event)">
   <div class="settings-modal">
@@ -1046,11 +1059,32 @@ function logout() {
   if (clockInterval) clearInterval(clockInterval);
 }
 
+// ── CONFIRM SHEET ──
+let _confirmCallback = null;
+function showConfirm(message, label, onConfirm) {
+  _confirmCallback = onConfirm;
+  document.getElementById('confirm-sheet-title').textContent = message;
+  document.getElementById('confirm-sheet-label').textContent = label;
+  document.getElementById('confirm-sheet-icon').innerHTML = IC.trash;
+  document.getElementById('confirm-sheet-ok').onclick = () => {
+    closeConfirmSheet();
+    if (_confirmCallback) _confirmCallback();
+  };
+  document.getElementById('confirm-sheet').classList.add('open');
+}
+function closeConfirmSheet(e) {
+  if (e && e.target !== document.getElementById('confirm-sheet')) return;
+  document.getElementById('confirm-sheet').classList.remove('open');
+  _confirmCallback = null;
+}
+
 // ── MENUS ──
 function closeAllMenus() {
   document.getElementById('action-sheet').classList.remove('open');
   document.getElementById('avatar-sheet').classList.remove('open');
+  document.getElementById('confirm-sheet').classList.remove('open');
   _actionSheetSessionId = null;
+  _confirmCallback = null;
 }
 
 // ── ACTION SHEET (card menu) ──
@@ -1230,7 +1264,7 @@ function startSession() {
   const customer = sel === '__custom__'
     ? document.getElementById('custom-name-input').value.trim()
     : sel;
-  if (!customer) { alert('Please select or enter a client name.'); return; }
+  if (!customer) { showConfirm('Please select or enter a client name.', 'OK', ()=>{}); return; }
   const notes = document.getElementById('start-notes').value.trim();
   const s = { id: uid(), customer, startTime: nowIL().toISOString(), endTime: null, breaks: [], notes };
   sessions.unshift(s);
@@ -1251,10 +1285,11 @@ function stopSession(id) {
   render();
 }
 function deleteSession(id) {
-  if (!confirm('Delete this session? This cannot be undone.')) return;
-  eraseSession(id);
-  sessions = sessions.filter(x => x.id !== id);
-  save(); render();
+  showConfirm('Delete this session?', 'Delete', () => {
+    eraseSession(id);
+    sessions = sessions.filter(x => x.id !== id);
+    save(); render();
+  });
 }
 
 // ── EDIT MODAL ──
@@ -1328,10 +1363,10 @@ function saveEdit() {
   const s  = sessions.find(x => x.id === id);
   if (!s) return;
   const customer = document.getElementById('edit-customer').value.trim();
-  if (!customer) { alert('Client name is required.'); return; }
+  if (!customer) { showConfirm('Client name is required.', 'OK', ()=>{}); return; }
   const sd = document.getElementById('edit-start-date').value;
   const st = document.getElementById('edit-start-time').value;
-  if (!sd || !st) { alert('Start date and time are required.'); return; }
+  if (!sd || !st) { showConfirm('Start date and time are required.', 'OK', ()=>{}); return; }
   s.customer  = customer;
   s.startTime = localInputToISO(sd, st);
   const ed = document.getElementById('edit-end-date').value;
