@@ -97,9 +97,10 @@
       display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white;
     }
     .top-title { font-size: 0.9rem; font-weight: 700; letter-spacing: -0.2px; }
-    .top-meta { font-size: 0.7rem; color: var(--slate-400); font-weight: 500; margin-top: 1px; }
+    .top-meta { font-size: 0.7rem; color: var(--slate-400); font-weight: 500; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+    .top-meta-sep { opacity: 0.4; }
+    .top-clock { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--slate-400); }
     .top-right { display: flex; align-items: center; gap: 0.7rem; }
-    .top-clock { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--slate-400); }
 
     /* ── SYNC BUTTON ── */
     .sync-btn {
@@ -451,11 +452,14 @@
         </div>
         <div>
           <div class="top-title">Pro Consulting Tracker</div>
-          <div class="top-meta" id="top-date"></div>
+          <div class="top-meta">
+            <span id="top-date"></span>
+            <span class="top-meta-sep">·</span>
+            <span class="top-clock" id="live-clock"></span>
+          </div>
         </div>
       </div>
       <div class="top-right">
-        <div class="top-clock" id="live-clock"></div>
         <button class="sync-btn" id="sync-btn" onclick="manualSync()" title="Sync">
           <span id="sync-icon-wrap" class="sync-icon-wrap"></span>
         </button>
