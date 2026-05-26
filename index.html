@@ -36,7 +36,14 @@
 
     html { -webkit-text-size-adjust: 100%; }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    * {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    /* Prevent iOS auto-zoom on ALL inputs universally */
+    input, select, textarea, button { font-size: 16px; }
 
     body {
       font-family: 'DM Sans', sans-serif;
@@ -45,12 +52,13 @@
       min-height: 100dvh;
       max-width: 480px;
       margin: 0 auto;
+      overscroll-behavior-y: none;
     }
 
     .icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .icon svg { display: block; }
 
-    .screen { display: none; flex-direction: column; min-height: 100vh; }
+    .screen { display: none; flex-direction: column; min-height: 100dvh; }
     .screen.active { display: flex; }
 
     /* ── LOGIN ── */
