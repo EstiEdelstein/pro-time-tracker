@@ -1070,8 +1070,9 @@ function showConfirm(message, label, onConfirm) {
   document.getElementById('confirm-sheet-label').textContent = label;
   document.getElementById('confirm-sheet-icon').innerHTML = IC.trash;
   document.getElementById('confirm-sheet-ok').onclick = () => {
+    const cb = _confirmCallback;
     closeConfirmSheet();
-    if (_confirmCallback) _confirmCallback();
+    if (cb) cb();
   };
   document.getElementById('confirm-sheet').classList.add('open');
 }
@@ -1107,8 +1108,9 @@ function actionSheetEdit() {
   if (_actionSheetSessionId) openEditModal(_actionSheetSessionId);
 }
 function actionSheetDelete() {
+  const id = _actionSheetSessionId;
   closeActionSheet();
-  if (_actionSheetSessionId) deleteSession(_actionSheetSessionId);
+  if (id) deleteSession(id);
 }
 function closeActionSheet(e) {
   if (e && e.target !== document.getElementById('action-sheet')) return;
