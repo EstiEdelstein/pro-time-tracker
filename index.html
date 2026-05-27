@@ -287,8 +287,12 @@
       display: flex; justify-content: space-around; text-align: center;
     }
     .stat-val { font-size: 1.25rem; font-weight: 700; color: var(--slate-800); font-family: 'DM Mono', monospace; }
-    .stat-lbl { font-size: 0.67rem; font-weight: 600; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+    .stat-lbl { font-size: 0.67rem; font-weight: 600; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; display: flex; align-items: center; justify-content: center; gap: 4px; }
     .stat-divider { width: 1px; background: var(--slate-200); }
+    .stat-coin-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--slate-400); display: inline-flex; align-items: center; transition: color 0.15s; line-height: 1; }
+    .stat-coin-btn:hover { color: var(--rose); }
+    .stat-coin-btn.active { color: #d97706; }
+    .stat-val.earnings { color: #d97706; }
 
     /* ── MODAL ── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 150; align-items: flex-end; justify-content: center; backdrop-filter: blur(2px); }
@@ -709,6 +713,7 @@ const IC = {
   nodata: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
   pause:  `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>`,
   cloud:  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>`,
+  coin:   `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M9.5 8h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3h4"/><path d="M12 7v1m0 8v1"/></svg>`,
 };
 
 // ── STATE ──
@@ -717,6 +722,7 @@ let sessions    = [];
 let customers   = [];
 let editBreaks  = [];
 let clockInterval = null;
+let _showEarnings = false;
 
 // Supabase state
 let db           = null;
@@ -1011,10 +1017,18 @@ function buildMonthOptions() {
     opts.push({ label, value });
   }
   sel.innerHTML = opts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  sel.value = thisMonth;
 }
 
 function getSelectedMonthFilter() {
   return document.getElementById('month-filter').value;
+}
+
+const RATE_PER_HOUR = 400;
+function toggleEarnings() {
+  _showEarnings = !_showEarnings;
+  renderHistory();
 }
 
 function sessionMatchesFilter(s, filterValue) {
@@ -1211,11 +1225,15 @@ function renderHistory() {
   if (done.length) {
     const totalMs = done.reduce((acc, s) => acc + durationMs(s.startTime, s.endTime, s.breaks), 0);
     const totalH  = (totalMs / 3600000).toFixed(1);
+    const earnings = Math.round(totalMs / 3600000 * RATE_PER_HOUR).toLocaleString('he-IL');
     const clients = new Set(done.map(s => s.customer)).size;
     bar.innerHTML = `<div class="summary-bar">
       <div><div class="stat-val">${done.length}</div><div class="stat-lbl">Sessions</div></div>
       <div class="stat-divider"></div>
-      <div><div class="stat-val">${totalH}h</div><div class="stat-lbl">Total</div></div>
+      <div>
+        <div class="stat-val${_showEarnings ? ' earnings' : ''}">${_showEarnings ? '₪' + earnings : totalH + 'h'}</div>
+        <div class="stat-lbl">Total <button class="stat-coin-btn${_showEarnings ? ' active' : ''}" onclick="toggleEarnings()" title="Toggle earnings">${IC.coin}</button></div>
+      </div>
       <div class="stat-divider"></div>
       <div><div class="stat-val">${clients}</div><div class="stat-lbl">Clients</div></div>
     </div>`;
