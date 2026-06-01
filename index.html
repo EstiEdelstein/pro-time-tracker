@@ -1118,8 +1118,9 @@ function openCardActionSheet(id) {
   document.getElementById('action-sheet').classList.add('open');
 }
 function actionSheetEdit() {
+  const id = _actionSheetSessionId;
   closeActionSheet();
-  if (_actionSheetSessionId) openEditModal(_actionSheetSessionId);
+  if (id) openEditModal(id);
 }
 function actionSheetDelete() {
   const id = _actionSheetSessionId;
