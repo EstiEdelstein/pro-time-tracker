@@ -381,18 +381,37 @@
 
     .client-list { margin-bottom: 1rem; }
     .client-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0.75rem 0.9rem; background: var(--slate-50);
+      background: var(--slate-50);
       border: 1px solid var(--slate-200); border-radius: var(--radius-sm);
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.4rem; padding: 0.7rem 0.9rem;
     }
+    .client-row-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.45rem;
+    }
+    .client-row-rate { display: flex; align-items: center; gap: 0.4rem; }
     .client-name { font-size: 0.9rem; font-weight: 600; color: var(--slate-700); }
     .client-del {
       background: transparent; border: none; color: var(--slate-300);
       cursor: pointer; padding: 4px; border-radius: 6px; display: flex;
-      transition: color 0.12s;
+      transition: color 0.12s; flex-shrink: 0;
     }
     .client-del:active { color: var(--red); background: var(--red-light); }
+    .rate-prefix { font-size: 0.82rem; font-weight: 700; color: var(--slate-500); flex-shrink: 0; }
+    .client-rate-input {
+      width: 76px; padding: 0.3rem 0.45rem;
+      border: 1.5px solid var(--slate-200); border-radius: 6px;
+      font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500;
+      color: var(--slate-800); background: var(--white); outline: none;
+    }
+    .client-rate-input:focus { border-color: var(--rose); }
+    .client-model-select {
+      flex: 1; padding: 0.3rem 0.45rem;
+      border: 1.5px solid var(--slate-200); border-radius: 6px;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      color: var(--slate-600); background: var(--white); outline: none;
+    }
+    .client-model-select:focus { border-color: var(--rose); }
 
     .add-client-row {
       display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;
@@ -687,7 +706,10 @@ const PASSWORD      = '3007';
 const TZ            = 'Asia/Jerusalem';
 const STORE_KEY     = 'pct_sessions_v3';
 const CUSTOMERS_KEY = 'pct_customers_v1';
-const DEFAULT_CUSTOMERS = ['Client Alpha', 'Client Beta', 'Client Gamma', 'Client Delta', 'Client Epsilon'];
+const DEFAULT_CUSTOMERS = [
+  { name: 'Client Alpha', rate: 0, rateModel: 'per_hour' },
+  { name: 'Client Beta',  rate: 0, rateModel: 'per_hour' },
+];
 
 // Fill in your Supabase project URL and anon key after creating the project.
 // Leave empty to run in offline/local-only mode.
@@ -739,8 +761,9 @@ function save() { localStorage.setItem(STORE_KEY, JSON.stringify(sessions)); }
 function loadCustomers() {
   try {
     const stored = localStorage.getItem(CUSTOMERS_KEY);
-    customers = stored ? JSON.parse(stored) : [...DEFAULT_CUSTOMERS];
-  } catch { customers = [...DEFAULT_CUSTOMERS]; }
+    const raw = stored ? JSON.parse(stored) : [...DEFAULT_CUSTOMERS];
+    customers = raw.map(c => typeof c === 'string' ? { name: c, rate: 0, rateModel: 'per_hour' } : c);
+  } catch { customers = DEFAULT_CUSTOMERS.map(c => ({ ...c })); }
 }
 function saveCustomers() { localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers)); }
 
@@ -808,13 +831,16 @@ async function syncFromServer() {
     save();
 
     if (!cfgRes.error && cfgRes.data && Array.isArray(cfgRes.data.customers)) {
-      customers = cfgRes.data.customers;
+      customers = cfgRes.data.customers.map(c => typeof c === 'string' ? { name: c, rate: 0, rateModel: 'per_hour' } : c);
       saveCustomers();
     }
 
     lastSyncAt = new Date();
     setSyncStatus('synced');
     render();
+    if (document.getElementById('modal-settings').classList.contains('open')) {
+      renderClientList();
+    }
   } catch (e) {
     console.warn('Sync from server failed', e);
     setSyncStatus('error');
@@ -917,7 +943,7 @@ async function manualSync() {
 function populateCustomerSelect() {
   const sel = document.getElementById('customer-select');
   sel.innerHTML = '<option value="">Select a client...</option>'
-    + customers.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')
+    + customers.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')
     + '<option value="__custom__">Other – enter manually</option>';
 }
 
@@ -941,16 +967,40 @@ function renderClientList() {
   }
   el.innerHTML = customers.map((c, i) => `
     <div class="client-row">
-      <span class="client-name">${esc(c)}</span>
-      <button class="client-del" onclick="removeClient(${i})" title="Remove">${IC.trash}</button>
+      <div class="client-row-top">
+        <span class="client-name">${esc(c.name)}</span>
+        <button class="client-del" onclick="removeClient(${i})" title="Remove">${IC.trash}</button>
+      </div>
+      <div class="client-row-rate">
+        <span class="rate-prefix">₪</span>
+        <input class="client-rate-input" type="number" min="0" step="1" value="${c.rate || 0}"
+          onchange="updateClientRate(${i}, this.value)" />
+        <select class="client-model-select" onchange="updateClientModel(${i}, this.value)">
+          <option value="per_hour"${c.rateModel === 'per_hour' ? ' selected' : ''}>/hour</option>
+          <option value="per_day"${c.rateModel === 'per_day' ? ' selected' : ''}>/day (7h)</option>
+          <option value="project"${c.rateModel === 'project' ? ' selected' : ''}>project</option>
+        </select>
+      </div>
     </div>`).join('');
+}
+function updateClientRate(i, val) {
+  const parsed = parseInt(val, 10);
+  if (isNaN(parsed)) return;
+  customers[i].rate = Math.max(0, parsed);
+  saveCustomers();
+  syncCustomers();
+}
+function updateClientModel(i, val) {
+  customers[i].rateModel = val;
+  saveCustomers();
+  syncCustomers();
 }
 function addClient() {
   const input = document.getElementById('add-client-input');
   const name  = input.value.trim();
   if (!name) return;
-  if (customers.includes(name)) { input.select(); return; }
-  customers.push(name);
+  if (customers.some(c => c.name === name)) { input.select(); return; }
+  customers.push({ name, rate: 0, rateModel: 'per_hour' });
   saveCustomers();
   syncCustomers();
   input.value = '';
@@ -1025,7 +1075,21 @@ function getSelectedMonthFilter() {
   return document.getElementById('month-filter').value;
 }
 
-const RATE_PER_HOUR = 400;
+function calcTotalEarnings(doneSessions) {
+  let total = 0;
+  const projectSeen = new Set();
+  for (const s of doneSessions) {
+    const cust = customers.find(c => c.name === s.customer);
+    if (!cust || !cust.rate) continue;
+    if (cust.rateModel === 'project') {
+      if (!projectSeen.has(cust.name)) { total += cust.rate; projectSeen.add(cust.name); }
+    } else {
+      const hours = durationMs(s.startTime, s.endTime, s.breaks) / 3600000;
+      total += cust.rateModel === 'per_day' ? cust.rate * (hours / 7) : cust.rate * hours;
+    }
+  }
+  return total;
+}
 function toggleEarnings() {
   _showEarnings = !_showEarnings;
   renderHistory();
@@ -1226,7 +1290,7 @@ function renderHistory() {
   if (done.length) {
     const totalMs = done.reduce((acc, s) => acc + durationMs(s.startTime, s.endTime, s.breaks), 0);
     const totalH  = (totalMs / 3600000).toFixed(1);
-    const earnings = Math.round(totalMs / 3600000 * RATE_PER_HOUR).toLocaleString('he-IL');
+    const earnings = Math.round(calcTotalEarnings(done)).toLocaleString('he-IL');
     const clients = new Set(done.map(s => s.customer)).size;
     bar.innerHTML = `<div class="summary-bar">
       <div><div class="stat-val">${done.length}</div><div class="stat-lbl">Sessions</div></div>
@@ -1279,7 +1343,7 @@ function openStartModal() {
     : null;
   const lastCustomer = lastSession ? lastSession.customer : '';
 
-  if (lastCustomer && customers.includes(lastCustomer)) {
+  if (lastCustomer && customers.some(c => c.name === lastCustomer)) {
     document.getElementById('customer-select').value = lastCustomer;
     document.getElementById('custom-name-group').style.display = 'none';
     document.getElementById('custom-name-input').value = '';
