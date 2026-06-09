@@ -1272,10 +1272,28 @@ function renderHistory() {
 // ── START SESSION ──
 function openStartModal() {
   populateCustomerSelect();
-  document.getElementById('customer-select').value    = '';
-  document.getElementById('custom-name-group').style.display = 'none';
-  document.getElementById('custom-name-input').value  = '';
-  document.getElementById('start-notes').value        = '';
+
+  // Pre-select customer from the most recent session
+  const lastSession = sessions.length
+    ? sessions.slice().sort((a, b) => new Date(b.startTime) - new Date(a.startTime))[0]
+    : null;
+  const lastCustomer = lastSession ? lastSession.customer : '';
+
+  if (lastCustomer && customers.includes(lastCustomer)) {
+    document.getElementById('customer-select').value = lastCustomer;
+    document.getElementById('custom-name-group').style.display = 'none';
+    document.getElementById('custom-name-input').value = '';
+  } else if (lastCustomer) {
+    document.getElementById('customer-select').value = '__custom__';
+    document.getElementById('custom-name-group').style.display = 'block';
+    document.getElementById('custom-name-input').value = lastCustomer;
+  } else {
+    document.getElementById('customer-select').value = '';
+    document.getElementById('custom-name-group').style.display = 'none';
+    document.getElementById('custom-name-input').value = '';
+  }
+
+  document.getElementById('start-notes').value = '';
   document.getElementById('modal-start').classList.add('open');
   lucide.createIcons();
 }
