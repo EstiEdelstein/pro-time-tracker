@@ -263,9 +263,9 @@
     .action-sheet-cancel:active { background: var(--slate-100); }
 
     /* ── MONTH FILTER ── */
-    .filter-row { margin-bottom: 1rem; }
+    .filter-row { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
     .filter-select {
-      width: 100%; padding: 0.6rem 0.85rem;
+      flex: 1; padding: 0.6rem 0.85rem;
       border: 1.5px solid var(--slate-200); border-radius: var(--radius-sm);
       font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600;
       color: var(--slate-700); background: var(--white); outline: none;
@@ -275,6 +275,26 @@
       padding-right: 2.2rem;
     }
     .filter-select:focus { border-color: var(--rose); }
+
+    /* ── PAYMENT STATUS ── */
+    .badge-ps { font-size: 0.67rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; letter-spacing: 0.3px; text-transform: uppercase; white-space: nowrap; }
+    .badge-ps-not-sent { background: var(--slate-100); color: var(--slate-400); }
+    .badge-ps-sent     { background: #fef9c3; color: #92400e; }
+    .badge-ps-paid     { background: #dcfce7; color: #166534; }
+
+    .as-ps-section { border-bottom: 1px solid var(--slate-100); margin-bottom: 0.4rem; padding-bottom: 0.75rem; }
+    .as-ps-label { font-size: 0.68rem; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+    .as-ps-row { display: flex; gap: 0.5rem; }
+    .as-ps-btn {
+      flex: 1; padding: 0.48rem 0.3rem;
+      border: 1.5px solid var(--slate-200); border-radius: var(--radius-xs);
+      font-size: 0.7rem; font-weight: 600; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; background: var(--white);
+      color: var(--slate-500); transition: all 0.12s; text-align: center;
+    }
+    .as-ps-btn.ps-active-not-sent { background: var(--slate-100); color: var(--slate-600); border-color: var(--slate-400); }
+    .as-ps-btn.ps-active-sent     { background: #fef9c3; color: #92400e; border-color: #d97706; }
+    .as-ps-btn.ps-active-paid     { background: #dcfce7; color: #166534; border-color: #16a34a; }
 
     /* ── EMPTY STATE ── */
     .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--slate-400); font-size: 0.85rem; font-weight: 500; line-height: 1.6; }
@@ -535,6 +555,12 @@
         <select class="filter-select" id="month-filter" onchange="renderHistory()">
           <!-- populated by JS -->
         </select>
+        <select class="filter-select" id="payment-filter" onchange="renderHistory()">
+          <option value="all">All Statuses</option>
+          <option value="invoice_not_sent">Not Invoiced</option>
+          <option value="invoice_sent">Invoice Sent</option>
+          <option value="paid">Paid</option>
+        </select>
       </div>
       <div id="summary-bar-container"></div>
       <div class="section-label">Completed Sessions</div>
@@ -556,6 +582,14 @@
   <div class="action-sheet">
     <span class="action-sheet-handle"></span>
     <div class="action-sheet-title" id="action-sheet-title"></div>
+    <div class="as-ps-section">
+      <div class="as-ps-label">Payment Status</div>
+      <div class="as-ps-row">
+        <button class="as-ps-btn" id="ps-btn-not-sent" onclick="setPaymentStatus(_actionSheetSessionId,'invoice_not_sent');closeActionSheet()">Not Invoiced</button>
+        <button class="as-ps-btn" id="ps-btn-sent" onclick="setPaymentStatus(_actionSheetSessionId,'invoice_sent');closeActionSheet()">Invoice Sent</button>
+        <button class="as-ps-btn" id="ps-btn-paid" onclick="openPaymentDateSheet(_actionSheetSessionId);closeActionSheet()">Paid</button>
+      </div>
+    </div>
     <button class="action-sheet-btn" id="action-sheet-edit" onclick="actionSheetEdit()">
       <span class="btn-icon" id="as-edit-icon"></span>
       Edit session
@@ -595,6 +629,22 @@
       <span id="confirm-sheet-label">Delete</span>
     </button>
     <button class="action-sheet-cancel" onclick="closeConfirmSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- ─── PAYMENT DATE SHEET ─── -->
+<div class="action-sheet-overlay" id="payment-date-sheet" onclick="closePaymentDateSheet(event)">
+  <div class="action-sheet">
+    <span class="action-sheet-handle"></span>
+    <div class="action-sheet-title">Mark as Paid</div>
+    <div class="form-group" style="margin:0.2rem 0 1rem">
+      <label class="form-label">Payment date</label>
+      <input class="form-input" type="date" id="payment-date-input" />
+    </div>
+    <button class="btn-primary" onclick="confirmPayment()" style="margin-top:0">
+      Confirm Payment
+    </button>
+    <button class="action-sheet-cancel" style="margin-top:0.5rem" onclick="closePaymentDateSheet()">Cancel</button>
   </div>
 </div>
 
@@ -755,6 +805,7 @@ let lastSyncAt   = null;
 // ── STORAGE ──
 function load() {
   try { sessions = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch { sessions = []; }
+  sessions = sessions.map(s => ({ paymentStatus: 'invoice_not_sent', ...s }));
 }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(sessions)); }
 
@@ -809,7 +860,7 @@ async function syncFromServer() {
 
     const [sessRes, cfgRes] = await Promise.all([
       db.from('sessions')
-        .select('id,customer,start_time,end_time,breaks,notes')
+        .select('id,customer,start_time,end_time,breaks,notes,payment_status,invoice_sent_at,paid_at')
         .eq('user_id', dbUser.id)
         .order('start_time', { ascending: false }),
       db.from('config')
@@ -821,12 +872,15 @@ async function syncFromServer() {
     if (sessRes.error) throw sessRes.error;
 
     sessions = (sessRes.data || []).map(r => ({
-      id:        r.id,
-      customer:  r.customer,
-      startTime: r.start_time,
-      endTime:   r.end_time,
-      breaks:    r.breaks || [],
-      notes:     r.notes  || '',
+      id:            r.id,
+      customer:      r.customer,
+      startTime:     r.start_time,
+      endTime:       r.end_time,
+      breaks:        r.breaks || [],
+      notes:         r.notes  || '',
+      paymentStatus:  r.payment_status  || 'invoice_not_sent',
+      invoiceSentAt:  r.invoice_sent_at  || null,
+      paidAt:         r.paid_at          || null,
     }));
     save();
 
@@ -851,14 +905,17 @@ async function upsertSession(s) {
   if (!db || !dbUser) return;
   try {
     const { error } = await db.from('sessions').upsert({
-      id:          s.id,
-      customer:    s.customer,
-      start_time:  s.startTime,
-      end_time:    s.endTime,
-      breaks:      s.breaks || [],
-      notes:       s.notes  || '',
-      user_id:     dbUser.id,
-      updated_at:  new Date().toISOString(),
+      id:             s.id,
+      customer:       s.customer,
+      start_time:     s.startTime,
+      end_time:       s.endTime,
+      breaks:         s.breaks || [],
+      notes:          s.notes  || '',
+      payment_status:   s.paymentStatus  || 'invoice_not_sent',
+      invoice_sent_at:  s.invoiceSentAt  || null,
+      paid_at:          s.paidAt         || null,
+      user_id:          dbUser.id,
+      updated_at:     new Date().toISOString(),
     }, { onConflict: 'id' });
     if (error) console.warn('upsertSession error', error);
   } catch (e) {
@@ -1075,6 +1132,41 @@ function getSelectedMonthFilter() {
   return document.getElementById('month-filter').value;
 }
 
+function getSelectedPaymentFilter() {
+  return document.getElementById('payment-filter').value;
+}
+
+function setPaymentStatus(id, status, paidAt) {
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  s.paymentStatus = status;
+  if (status === 'invoice_not_sent') { s.invoiceSentAt = null; s.paidAt = null; }
+  if (status === 'invoice_sent')     { s.invoiceSentAt = s.invoiceSentAt || new Date().toISOString(); s.paidAt = null; }
+  if (status === 'paid')             { s.paidAt = paidAt || new Date().toISOString(); }
+  save();
+  upsertSession(s);
+  renderHistory();
+}
+
+let _paymentDateSessionId = null;
+function openPaymentDateSheet(id) {
+  _paymentDateSessionId = id;
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+  document.getElementById('payment-date-input').value = today;
+  document.getElementById('payment-date-sheet').classList.add('open');
+}
+function closePaymentDateSheet(e) {
+  if (e && e.target !== document.getElementById('payment-date-sheet')) return;
+  document.getElementById('payment-date-sheet').classList.remove('open');
+  _paymentDateSessionId = null;
+}
+function confirmPayment() {
+  const id   = _paymentDateSessionId;
+  const date = document.getElementById('payment-date-input').value;
+  closePaymentDateSheet();
+  if (id && date) setPaymentStatus(id, 'paid', new Date(date + 'T12:00:00').toISOString());
+}
+
 function calcTotalEarnings(doneSessions) {
   let total = 0;
   const projectSeen = new Set();
@@ -1179,6 +1271,14 @@ function openCardActionSheet(id) {
   document.getElementById('action-sheet-title').textContent = s.customer;
   document.getElementById('as-edit-icon').innerHTML   = IC.pencil;
   document.getElementById('as-delete-icon').innerHTML = IC.trash;
+
+  const ps = s.paymentStatus || 'invoice_not_sent';
+  const psMap = { 'not-sent': 'invoice_not_sent', 'sent': 'invoice_sent', 'paid': 'paid' };
+  ['not-sent', 'sent', 'paid'].forEach(k => {
+    const btn = document.getElementById(`ps-btn-${k}`);
+    btn.className = 'as-ps-btn' + (ps === psMap[k] ? ` ps-active-${k}` : '');
+  });
+
   document.getElementById('action-sheet').classList.add('open');
 }
 function actionSheetEdit() {
@@ -1279,9 +1379,11 @@ function renderActiveCards() {
 }
 
 function renderHistory() {
-  const filter = getSelectedMonthFilter();
-  const done   = sessions
+  const filter   = getSelectedMonthFilter();
+  const psFilter = getSelectedPaymentFilter();
+  const done     = sessions
     .filter(s => s.endTime && sessionMatchesFilter(s, filter))
+    .filter(s => psFilter === 'all' || (s.paymentStatus || 'invoice_not_sent') === psFilter)
     .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
 
   const el  = document.getElementById('history-list');
@@ -1314,11 +1416,14 @@ function renderHistory() {
   el.innerHTML = done.map(s => {
     const dur        = durationMs(s.startTime, s.endTime, s.breaks);
     const breakCount = (s.breaks || []).filter(b => b.start && b.end).length;
+    const ps         = s.paymentStatus || 'invoice_not_sent';
+    const psLabel    = ps === 'paid' ? 'Paid' : ps === 'invoice_sent' ? 'Invoice Sent' : 'Not Invoiced';
+    const psCls      = ps === 'paid' ? 'badge-ps-paid' : ps === 'invoice_sent' ? 'badge-ps-sent' : 'badge-ps-not-sent';
     return `<div class="session-card is-done">
       <div class="card-header">
         <div class="card-customer">${esc(s.customer)}</div>
         <div class="card-header-right">
-          <span class="badge badge-done">Done</span>
+          <span class="badge badge-ps ${psCls}">${psLabel}</span>
           <button class="menu-trigger" onclick="openCardActionSheet('${s.id}')" title="More options">${IC.dots}</button>
         </div>
       </div>
@@ -1326,6 +1431,8 @@ function renderHistory() {
         <div class="meta-item">${IC.clock} <strong>${formatILDate(s.startTime)}</strong></div>
         <div class="meta-item">${IC.user} ${formatILTime(s.startTime)} – ${formatILTime(s.endTime)}</div>
         ${breakCount ? `<div class="meta-item">${IC.coffee} ${breakCount} break${breakCount > 1 ? 's' : ''}</div>` : ''}
+        ${s.invoiceSentAt ? `<div class="meta-item">${IC.pencil} Invoiced <strong>${formatILDate(s.invoiceSentAt)}</strong></div>` : ''}
+        ${s.paidAt ? `<div class="meta-item">${IC.coin} Paid <strong>${formatILDate(s.paidAt)}</strong></div>` : ''}
       </div>
       ${s.notes ? `<div class="card-note">${esc(s.notes)}</div>` : ''}
       <div class="card-duration">${IC.timer} ${formatDuration(dur)}</div>
