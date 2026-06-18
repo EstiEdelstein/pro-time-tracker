@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23DB2777'/%3E%3Ccircle cx='16' cy='16' r='9' stroke='white' stroke-width='2' fill='none'/%3E%3Ccircle cx='16' cy='16' r='5' stroke='white' stroke-width='2' fill='none'/%3E%3Ccircle cx='16' cy='16' r='1.5' fill='white'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
@@ -454,6 +454,106 @@
     .add-client-btn:active { background: var(--rose-dark); }
     .no-clients { font-size: 0.82rem; color: var(--slate-400); font-weight: 500; text-align: center; padding: 1.5rem 0; }
 
+    /* ── REPORTS (desktop only) ── */
+    .desktop-only { display: none !important; }
+    @media (min-width: 768px) {
+      .tab-btn.desktop-only { display: flex !important; }
+      body.reports-mode { max-width: 920px; }
+    }
+    @media (max-width: 767px) {
+      #tab-reports { display: none !important; }
+    }
+    .report-controls {
+      background: var(--white); border-radius: var(--radius);
+      padding: 1.1rem 1.2rem; margin-bottom: 1.2rem;
+      box-shadow: var(--shadow-sm); border: 1px solid var(--slate-200);
+    }
+    .report-controls-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.7rem; }
+    .report-controls-grid .form-group { margin-bottom: 0; }
+    .biz-details { margin-top: 0.9rem; }
+    .biz-details summary {
+      font-size: 0.78rem; font-weight: 700; color: var(--slate-500);
+      cursor: pointer; user-select: none;
+    }
+    .biz-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; margin-top: 0.8rem; }
+    .biz-grid .form-group { margin-bottom: 0; }
+    .report-actions { display: flex; gap: 0.7rem; margin-top: 1rem; align-items: center; }
+    .report-actions .btn-primary { width: auto; margin-top: 0; padding: 0.75rem 1.4rem; }
+    .btn-print {
+      display: flex; align-items: center; gap: 7px;
+      padding: 0.75rem 1.4rem; background: var(--slate-900); color: white;
+      border: none; border-radius: var(--radius-sm); font-size: 0.88rem; font-weight: 700;
+      cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s;
+    }
+    .btn-print:active { opacity: 0.85; }
+    .report-note { font-size: 0.8rem; font-weight: 600; color: #d97706; margin-top: 0.7rem; min-height: 1em; }
+
+    /* ── INVOICE DOCUMENT ── */
+    .invoice-doc {
+      background: var(--white); direction: rtl;
+      font-family: 'Heebo', 'DM Sans', sans-serif; color: #1a2233;
+      padding: 3rem 3.2rem; margin: 0 auto 2rem; max-width: 860px;
+      border: 1px solid var(--slate-200); border-radius: 6px;
+      box-shadow: var(--shadow);
+    }
+    .inv-top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      border-bottom: 3px solid var(--rose); padding-bottom: 1.4rem; margin-bottom: 1.6rem;
+    }
+    .inv-biz-name { font-size: 1.45rem; font-weight: 800; color: var(--slate-900); margin-bottom: 0.3rem; }
+    .inv-biz-line { font-size: 0.82rem; color: var(--slate-600); line-height: 1.6; }
+    .inv-doc-meta { text-align: left; }
+    .inv-doc-type { font-size: 1.55rem; font-weight: 800; color: var(--rose); letter-spacing: -0.5px; }
+    .inv-doc-line { font-size: 0.85rem; color: var(--slate-600); margin-top: 0.25rem; }
+    .inv-doc-line strong { color: var(--slate-800); font-weight: 700; }
+    .inv-billto { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.4rem; }
+    .inv-billto-label { font-size: 0.7rem; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 0.2rem; }
+    .inv-billto-name { font-size: 1.15rem; font-weight: 700; color: var(--slate-900); }
+    .inv-period { font-size: 0.82rem; color: var(--slate-600); }
+    .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    .inv-table th {
+      background: var(--slate-900); color: white; font-size: 0.74rem; font-weight: 600;
+      padding: 0.6rem 0.8rem; text-align: right; letter-spacing: 0.4px;
+      print-color-adjust: exact; -webkit-print-color-adjust: exact;
+    }
+    .inv-table th:last-child, .inv-table td:last-child { text-align: left; }
+    .inv-table td {
+      padding: 0.6rem 0.8rem; font-size: 0.84rem; color: var(--slate-700);
+      border-bottom: 1px solid var(--slate-100); vertical-align: top;
+    }
+    .inv-table tbody tr:nth-child(even) td { background: var(--slate-50); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .inv-row-desc { font-weight: 500; color: var(--slate-800); }
+    .inv-row-time { display: block; font-size: 0.72rem; color: var(--slate-400); margin-top: 1px; direction: ltr; text-align: right; }
+    .inv-num { font-family: 'DM Mono', monospace; white-space: nowrap; }
+    .inv-totals { display: flex; justify-content: flex-end; margin-bottom: 2rem; }
+    .inv-totals-box { width: 290px; }
+    .inv-tot-row {
+      display: flex; justify-content: space-between; padding: 0.45rem 0.8rem;
+      font-size: 0.86rem; color: var(--slate-600); border-bottom: 1px solid var(--slate-100);
+    }
+    .inv-tot-row span:last-child { font-family: 'DM Mono', monospace; color: var(--slate-800); }
+    .inv-tot-row.grand {
+      background: var(--rose-light); border-bottom: none; border-radius: 8px;
+      margin-top: 0.4rem; padding: 0.65rem 0.8rem;
+      font-size: 1rem; font-weight: 800; color: var(--rose-dark);
+      print-color-adjust: exact; -webkit-print-color-adjust: exact;
+    }
+    .inv-tot-row.grand span:last-child { color: var(--rose-dark); font-weight: 700; }
+    .inv-footer { border-top: 1px solid var(--slate-200); padding-top: 1rem; text-align: center; }
+    .inv-thanks { font-size: 0.88rem; font-weight: 600; color: var(--slate-700); margin-bottom: 0.3rem; }
+    .inv-disclaimer { font-size: 0.72rem; color: var(--slate-400); }
+
+    @media print {
+      body { max-width: none !important; background: white; }
+      body * { visibility: hidden; }
+      #invoice-doc, #invoice-doc * { visibility: visible; }
+      #invoice-doc {
+        position: absolute; top: 0; right: 0; left: 0; width: 100%;
+        margin: 0; padding: 1.5rem 0.5rem; border: none; box-shadow: none; border-radius: 0;
+        max-width: none;
+      }
+    }
+
     ::-webkit-scrollbar { width: 3px; }
     ::-webkit-scrollbar-thumb { background: var(--slate-200); border-radius: 2px; }
   </style>
@@ -528,13 +628,17 @@
   </div>
 
   <div class="tabs-row">
-    <button class="tab-btn active" onclick="switchTab('active')">
+    <button class="tab-btn active" data-tab="active" onclick="switchTab('active')">
       <i data-lucide="zap" class="icon" style="width:13px;height:13px"></i>
       Active
     </button>
-    <button class="tab-btn" onclick="switchTab('history')">
+    <button class="tab-btn" data-tab="history" onclick="switchTab('history')">
       <i data-lucide="clock" class="icon" style="width:13px;height:13px"></i>
       History
+    </button>
+    <button class="tab-btn desktop-only" data-tab="reports" onclick="switchTab('reports')">
+      <i data-lucide="file-text" class="icon" style="width:13px;height:13px"></i>
+      Reports
     </button>
   </div>
 
@@ -565,6 +669,76 @@
       <div id="summary-bar-container"></div>
       <div class="section-label">Completed Sessions</div>
       <div id="history-list"></div>
+    </div>
+
+    <!-- REPORTS TAB (desktop / web only) -->
+    <div class="tab-panel" id="tab-reports" style="display:none">
+      <div class="report-controls">
+        <div class="report-controls-grid">
+          <div class="form-group">
+            <label class="form-label">Client</label>
+            <select class="form-select" id="report-customer"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">From</label>
+            <input class="form-input" type="date" id="report-from" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">To</label>
+            <input class="form-input" type="date" id="report-to" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select class="form-select" id="report-status">
+              <option value="all">All Statuses</option>
+              <option value="invoice_not_sent">Not Invoiced</option>
+              <option value="invoice_sent">Invoice Sent</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Document #</label>
+            <input class="form-input" type="text" id="report-number" maxlength="20" />
+          </div>
+        </div>
+        <details class="biz-details">
+          <summary>Business details (shown on the document)</summary>
+          <div class="biz-grid">
+            <div class="form-group">
+              <label class="form-label">Business Name</label>
+              <input class="form-input" id="biz-name" type="text" onchange="updateBiz('name', this.value)" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">עוסק מורשה / ח.פ</label>
+              <input class="form-input" id="biz-regId" type="text" onchange="updateBiz('regId', this.value)" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Address</label>
+              <input class="form-input" id="biz-address" type="text" onchange="updateBiz('address', this.value)" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input class="form-input" id="biz-phone" type="text" onchange="updateBiz('phone', this.value)" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input class="form-input" id="biz-email" type="email" onchange="updateBiz('email', this.value)" />
+            </div>
+          </div>
+        </details>
+        <div class="report-actions">
+          <button class="btn-primary" onclick="generateReport()">
+            <i data-lucide="file-text" class="icon" style="width:15px;height:15px"></i>
+            Generate Report
+          </button>
+          <button class="btn-print" id="report-print-btn" onclick="window.print()" style="display:none">
+            <i data-lucide="printer" class="icon" style="width:15px;height:15px"></i>
+            Print / Save PDF
+          </button>
+        </div>
+        <div class="report-note" id="report-note"></div>
+      </div>
+      <div id="invoice-container"></div>
     </div>
   </div>
 
@@ -1113,7 +1287,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 function buildMonthOptions() {
   const sel  = document.getElementById('month-filter');
   const now  = new Date();
-  const opts = [{ label: 'All Time', value: 'all' }];
+  const opts = [{ label: 'All Time', value: 'all' }, { label: 'Today', value: 'today' }];
   for (let i = 0; i <= 6; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     let label;
@@ -1189,10 +1363,13 @@ function toggleEarnings() {
 
 function sessionMatchesFilter(s, filterValue) {
   if (filterValue === 'all') return true;
+  const sessionDate = new Date(s.startTime).toLocaleDateString('en-CA', { timeZone: TZ });
+  if (filterValue === 'today') {
+    const todayDate = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+    return sessionDate === todayDate;
+  }
   const [fy, fm] = filterValue.split('-').map(Number);
-  const d  = new Date(s.startTime);
-  const y  = parseInt(d.toLocaleDateString('en-CA', { timeZone: TZ }).split('-')[0]);
-  const mo = parseInt(d.toLocaleDateString('en-CA', { timeZone: TZ }).split('-')[1]);
+  const [y, mo]  = sessionDate.split('-').map(Number);
   return y === fy && mo === fm;
 }
 
@@ -1338,12 +1515,15 @@ function updateTopBar() {
 
 // ── TABS ──
 window.switchTab = function(tab) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active', (i === 0 && tab === 'active') || (i === 1 && tab === 'history'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
   });
-  document.getElementById('tab-active').style.display  = tab === 'active'  ? 'block' : 'none';
-  document.getElementById('tab-history').style.display = tab === 'history' ? 'block' : 'none';
+  ['active', 'history', 'reports'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.body.classList.toggle('reports-mode', tab === 'reports');
   if (tab === 'history') renderHistory();
+  if (tab === 'reports') initReportsTab();
 };
 
 // ── RENDER ──
@@ -1438,6 +1618,189 @@ function renderHistory() {
       <div class="card-duration">${IC.timer} ${formatDuration(dur)}</div>
     </div>`;
   }).join('');
+}
+
+// ── REPORTS (חשבונית עסקה) ──
+const VAT_RATE = 0.18;
+const BIZ_KEY  = 'pct_business_v1';
+let bizProfile = { name: 'Beasymom ltd', regId: '', address: '', phone: '', email: '' };
+
+function loadBiz() {
+  try { bizProfile = { ...bizProfile, ...JSON.parse(localStorage.getItem(BIZ_KEY) || '{}') }; }
+  catch (e) { console.warn('loadBiz failed', e); }
+}
+function updateBiz(field, val) {
+  bizProfile[field] = val.trim();
+  localStorage.setItem(BIZ_KEY, JSON.stringify(bizProfile));
+}
+
+function reportCustomerNames() {
+  const names = new Set(customers.map(c => c.name));
+  sessions.forEach(s => { if (s.customer) names.add(s.customer); });
+  return [...names].sort((a, b) => a.localeCompare(b, 'he'));
+}
+
+function initReportsTab() {
+  loadBiz();
+
+  const sel = document.getElementById('report-customer');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select a client...</option>'
+    + reportCustomerNames().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if (current) sel.value = current;
+
+  const from = document.getElementById('report-from');
+  const to   = document.getElementById('report-to');
+  const now  = new Date();
+  const ym   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  if (!from.value) from.value = `${ym}-01`;
+  if (!to.value)   to.value   = now.toLocaleDateString('en-CA', { timeZone: TZ });
+
+  const num = document.getElementById('report-number');
+  if (!num.value) num.value = `${ym.replace('-', '')}-01`;
+
+  ['name', 'regId', 'address', 'phone', 'email'].forEach(f => {
+    document.getElementById('biz-' + f).value = bizProfile[f] || '';
+  });
+
+  lucide.createIcons();
+}
+
+function fmtMoney(n) {
+  return '₪' + n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtHours(ms) {
+  return (ms / 3600000).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function heDate(iso) {
+  return new Date(iso).toLocaleDateString('he-IL', { timeZone: TZ });
+}
+
+function generateReport() {
+  const customer  = document.getElementById('report-customer').value;
+  const from      = document.getElementById('report-from').value;
+  const to        = document.getElementById('report-to').value;
+  const psFilter  = document.getElementById('report-status').value;
+  const docNum    = document.getElementById('report-number').value.trim() || '—';
+  const note      = document.getElementById('report-note');
+  const container = document.getElementById('invoice-container');
+  const printBtn  = document.getElementById('report-print-btn');
+
+  note.textContent = '';
+  printBtn.style.display = 'none';
+  container.innerHTML = '';
+
+  if (!customer) { note.textContent = 'Please select a client.'; return; }
+  if (from && to && from > to) { note.textContent = '"From" date must be on or before "To" date.'; return; }
+
+  const matched = sessions
+    .filter(s => s.endTime && s.customer === customer)
+    .filter(s => {
+      const d = formatILDateInput(s.startTime);
+      return (!from || d >= from) && (!to || d <= to);
+    })
+    .filter(s => psFilter === 'all' || (s.paymentStatus || 'invoice_not_sent') === psFilter)
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+
+  if (!matched.length) { note.textContent = 'No completed sessions match these filters.'; return; }
+
+  const cust  = customers.find(c => c.name === customer);
+  const rate  = cust ? (cust.rate || 0) : 0;
+  const model = cust ? (cust.rateModel || 'per_hour') : 'per_hour';
+  if (!rate) {
+    note.textContent = 'Note: no billing rate is set for this client (Settings → Clients) — amounts show ₪0.00.';
+  }
+
+  const rateLabel = model === 'per_hour' ? `${fmtMoney(rate)} לשעה`
+                  : model === 'per_day'  ? `${fmtMoney(rate)} ליום (7 ש׳)`
+                  : '—';
+
+  let subtotal = 0;
+  let totalMs  = 0;
+  const bodyRows = matched.map((s, i) => {
+    const ms = durationMs(s.startTime, s.endTime, s.breaks);
+    totalMs += ms;
+    let amount = null;
+    if (model === 'per_hour') amount = rate * (ms / 3600000);
+    if (model === 'per_day')  amount = rate * (ms / 3600000 / 7);
+    if (amount !== null) subtotal += amount;
+    return `<tr>
+      <td class="inv-num">${i + 1}</td>
+      <td class="inv-num">${heDate(s.startTime)}</td>
+      <td>
+        <span class="inv-row-desc">${esc(s.notes || 'שירותי ייעוץ')}</span>
+        <span class="inv-row-time">${formatILTime(s.startTime)}–${formatILTime(s.endTime)}</span>
+      </td>
+      <td class="inv-num">${fmtHours(ms)}</td>
+      <td class="inv-num">${rateLabel}</td>
+      <td class="inv-num">${amount !== null ? fmtMoney(amount) : '—'}</td>
+    </tr>`;
+  });
+
+  if (model === 'project') {
+    subtotal = rate;
+    bodyRows.push(`<tr>
+      <td class="inv-num">${matched.length + 1}</td>
+      <td></td>
+      <td><span class="inv-row-desc">מחיר פרויקט — ${esc(customer)}</span></td>
+      <td></td><td></td>
+      <td class="inv-num">${fmtMoney(rate)}</td>
+    </tr>`);
+  }
+
+  const vat   = subtotal * VAT_RATE;
+  const total = subtotal + vat;
+
+  const bizLines = [
+    bizProfile.regId   ? `עוסק מורשה / ח.פ ${esc(bizProfile.regId)}` : '',
+    bizProfile.address ? esc(bizProfile.address) : '',
+    [bizProfile.phone ? esc(bizProfile.phone) : '', bizProfile.email ? esc(bizProfile.email) : '']
+      .filter(Boolean).join(' · '),
+  ].filter(Boolean).map(l => `<div class="inv-biz-line">${l}</div>`).join('');
+
+  const periodFrom = from ? heDate(from + 'T12:00:00') : heDate(matched[0].startTime);
+  const periodTo   = to   ? heDate(to + 'T12:00:00')   : heDate(matched[matched.length - 1].startTime);
+
+  container.innerHTML = `<div class="invoice-doc" id="invoice-doc">
+    <div class="inv-top">
+      <div class="inv-biz">
+        <div class="inv-biz-name">${esc(bizProfile.name || '')}</div>
+        ${bizLines}
+      </div>
+      <div class="inv-doc-meta">
+        <div class="inv-doc-type">חשבונית עסקה</div>
+        <div class="inv-doc-line">מס׳ מסמך: <strong>${esc(docNum)}</strong></div>
+        <div class="inv-doc-line">תאריך הפקה: <strong>${heDate(new Date().toISOString())}</strong></div>
+      </div>
+    </div>
+    <div class="inv-billto">
+      <div>
+        <div class="inv-billto-label">לכבוד</div>
+        <div class="inv-billto-name">${esc(customer)}</div>
+      </div>
+      <div class="inv-period">תקופת חיוב: <span dir="ltr">${periodFrom} – ${periodTo}</span></div>
+    </div>
+    <table class="inv-table">
+      <thead><tr>
+        <th>#</th><th>תאריך</th><th>פירוט</th><th>שעות</th><th>תעריף</th><th>סכום</th>
+      </tr></thead>
+      <tbody>${bodyRows.join('')}</tbody>
+    </table>
+    <div class="inv-totals">
+      <div class="inv-totals-box">
+        <div class="inv-tot-row"><span>סה״כ שעות</span><span>${fmtHours(totalMs)}</span></div>
+        <div class="inv-tot-row"><span>סה״כ לפני מע״מ</span><span>${fmtMoney(subtotal)}</span></div>
+        <div class="inv-tot-row"><span>מע״מ 18%</span><span>${fmtMoney(vat)}</span></div>
+        <div class="inv-tot-row grand"><span>סה״כ לתשלום</span><span>${fmtMoney(total)}</span></div>
+      </div>
+    </div>
+    <div class="inv-footer">
+      <div class="inv-thanks">תודה על שיתוף הפעולה!</div>
+      <div class="inv-disclaimer">מסמך זה הינו חשבונית עסקה ואינו מהווה חשבונית מס.</div>
+    </div>
+  </div>`;
+
+  printBtn.style.display = 'flex';
 }
 
 // ── START SESSION ──
