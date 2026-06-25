@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
       --rose:       #DB2777;
@@ -468,7 +469,7 @@
       padding: 1.1rem 1.2rem; margin-bottom: 1.2rem;
       box-shadow: var(--shadow-sm); border: 1px solid var(--slate-200);
     }
-    .report-controls-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.7rem; }
+    .report-controls-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; }
     .report-controls-grid .form-group { margin-bottom: 0; }
     .biz-details { margin-top: 0.9rem; }
     .biz-details summary {
@@ -543,6 +544,20 @@
     .inv-thanks { font-size: 0.88rem; font-weight: 600; color: var(--slate-700); margin-bottom: 0.3rem; }
     .inv-disclaimer { font-size: 0.72rem; color: var(--slate-400); }
 
+    .inv-desc-edit {
+      display: inline-block;
+      outline: none;
+      border-bottom: 1.5px dashed var(--slate-300);
+      cursor: text;
+      min-width: 3rem;
+      padding: 1px 3px;
+      border-radius: 2px;
+      transition: background 0.1s;
+    }
+    .inv-desc-edit:focus {
+      border-bottom-color: var(--slate-500);
+      background: var(--slate-50);
+    }
     @media print {
       body { max-width: none !important; background: white; }
       body * { visibility: hidden; }
@@ -552,6 +567,7 @@
         margin: 0; padding: 1.5rem 0.5rem; border: none; box-shadow: none; border-radius: 0;
         max-width: none;
       }
+      .inv-desc-edit { border: none; background: none; cursor: default; }
     }
 
     ::-webkit-scrollbar { width: 3px; }
@@ -700,6 +716,13 @@
             <label class="form-label">Document #</label>
             <input class="form-input" type="text" id="report-number" maxlength="20" />
           </div>
+          <div class="form-group">
+            <label class="form-label">Group By</label>
+            <select class="form-select" id="report-type">
+              <option value="per_session">Per Session</option>
+              <option value="per_date">Per Date</option>
+            </select>
+          </div>
         </div>
         <details class="biz-details">
           <summary>Business details (shown on the document)</summary>
@@ -734,6 +757,10 @@
           <button class="btn-print" id="report-print-btn" onclick="window.print()" style="display:none">
             <i data-lucide="printer" class="icon" style="width:15px;height:15px"></i>
             Print / Save PDF
+          </button>
+          <button class="btn-print" id="report-download-btn" onclick="downloadPdf()" style="display:none">
+            <i data-lucide="download" class="icon" style="width:15px;height:15px"></i>
+            Download PDF
           </button>
         </div>
         <div class="report-note" id="report-note"></div>
@@ -1029,23 +1056,29 @@ async function signOutSupabase() {
 
 async function syncFromServer() {
   if (!db || !dbUser) return;
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Sync timeout')), 15000)
+  );
   try {
     setSyncStatus('syncing');
 
-    const [sessRes, cfgRes] = await Promise.all([
-      db.from('sessions')
-        .select('id,customer,start_time,end_time,breaks,notes,payment_status,invoice_sent_at,paid_at')
-        .eq('user_id', dbUser.id)
-        .order('start_time', { ascending: false }),
-      db.from('config')
-        .select('customers')
-        .eq('user_id', dbUser.id)
-        .single(),
+    const [sessRes, cfgRes] = await Promise.race([
+      timeout,
+      Promise.all([
+        db.from('sessions')
+          .select('id,customer,start_time,end_time,breaks,notes,payment_status,invoice_sent_at,paid_at')
+          .eq('user_id', dbUser.id)
+          .order('start_time', { ascending: false }),
+        db.from('config')
+          .select('customers')
+          .eq('user_id', dbUser.id)
+          .single(),
+      ]),
     ]);
 
     if (sessRes.error) throw sessRes.error;
 
-    sessions = (sessRes.data || []).map(r => ({
+    const serverSessions = (sessRes.data || []).map(r => ({
       id:            r.id,
       customer:      r.customer,
       startTime:     r.start_time,
@@ -1056,11 +1089,27 @@ async function syncFromServer() {
       invoiceSentAt:  r.invoice_sent_at  || null,
       paidAt:         r.paid_at          || null,
     }));
+    // Keep any local sessions not yet acknowledged by the server (e.g. started offline)
+    const serverIds = new Set(serverSessions.map(s => s.id));
+    const localOnly = sessions.filter(s => !serverIds.has(s.id));
+    sessions = [...serverSessions, ...localOnly];
     save();
 
     if (!cfgRes.error && cfgRes.data && Array.isArray(cfgRes.data.customers)) {
-      customers = cfgRes.data.customers.map(c => typeof c === 'string' ? { name: c, rate: 0, rateModel: 'per_hour' } : c);
+      const incoming = cfgRes.data.customers.map(c =>
+        typeof c === 'string' ? { name: c, rate: 0, rateModel: 'per_hour' } : c
+      );
+      // Merge: if the server has rate:0 (e.g. old string-format data) but local has a
+      // configured rate, keep the local value so earnings don't silently reset to ₪0.
+      const localMap = new Map(customers.map(c => [c.name, c]));
+      const hadStaleSeverData = incoming.some(r => !r.rate && localMap.get(r.name)?.rate);
+      customers = incoming.map(remote => {
+        const local = localMap.get(remote.name);
+        return (local && local.rate && !remote.rate) ? local : remote;
+      });
       saveCustomers();
+      // Push the correct rates back to server if we detected stale data there
+      if (hadStaleSeverData) syncCustomers();
     }
 
     lastSyncAt = new Date();
@@ -1257,8 +1306,13 @@ function formatILTimeInput(iso) {
   return new Date(iso).toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
 }
 function localInputToISO(dateStr, timeStr) {
-  const fake = new Date(`${dateStr}T${timeStr}:00`);
-  return new Date(fake.getTime() - getILOffsetMinutes(fake) * 60000).toISOString();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes]   = timeStr.split(':').map(Number);
+  // Probe the IL offset at noon UTC on that date so DST boundary sessions (e.g. 2 AM
+  // on the spring-forward day) get the correct offset rather than a shifted one.
+  const noon     = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const ilOffset = getILOffsetMinutes(noon);
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0) - ilOffset * 60000).toISOString();
 }
 function getILOffsetMinutes(d) {
   const u  = d.toLocaleString('en-US', { timeZone: 'UTC' });
@@ -1338,7 +1392,7 @@ function confirmPayment() {
   const id   = _paymentDateSessionId;
   const date = document.getElementById('payment-date-input').value;
   closePaymentDateSheet();
-  if (id && date) setPaymentStatus(id, 'paid', new Date(date + 'T12:00:00').toISOString());
+  if (id && date) setPaymentStatus(id, 'paid', localInputToISO(date, '12:00'));
 }
 
 function calcTotalEarnings(doneSessions) {
@@ -1677,17 +1731,20 @@ function heDate(iso) {
 }
 
 function generateReport() {
-  const customer  = document.getElementById('report-customer').value;
-  const from      = document.getElementById('report-from').value;
-  const to        = document.getElementById('report-to').value;
-  const psFilter  = document.getElementById('report-status').value;
-  const docNum    = document.getElementById('report-number').value.trim() || '—';
-  const note      = document.getElementById('report-note');
-  const container = document.getElementById('invoice-container');
-  const printBtn  = document.getElementById('report-print-btn');
+  const customer    = document.getElementById('report-customer').value;
+  const from        = document.getElementById('report-from').value;
+  const to          = document.getElementById('report-to').value;
+  const psFilter    = document.getElementById('report-status').value;
+  const reportType  = document.getElementById('report-type').value;
+  const docNum      = document.getElementById('report-number').value.trim() || '—';
+  const note        = document.getElementById('report-note');
+  const container   = document.getElementById('invoice-container');
+  const printBtn    = document.getElementById('report-print-btn');
+  const dlBtn       = document.getElementById('report-download-btn');
 
   note.textContent = '';
   printBtn.style.display = 'none';
+  dlBtn.style.display = 'none';
   container.innerHTML = '';
 
   if (!customer) { note.textContent = 'Please select a client.'; return; }
@@ -1717,35 +1774,78 @@ function generateReport() {
 
   let subtotal = 0;
   let totalMs  = 0;
-  const bodyRows = matched.map((s, i) => {
-    const ms = durationMs(s.startTime, s.endTime, s.breaks);
-    totalMs += ms;
-    let amount = null;
-    if (model === 'per_hour') amount = rate * (ms / 3600000);
-    if (model === 'per_day')  amount = rate * (ms / 3600000 / 7);
-    if (amount !== null) subtotal += amount;
-    return `<tr>
-      <td class="inv-num">${i + 1}</td>
-      <td class="inv-num">${heDate(s.startTime)}</td>
-      <td>
-        <span class="inv-row-desc">${esc(s.notes || 'שירותי ייעוץ')}</span>
-        <span class="inv-row-time">${formatILTime(s.startTime)}–${formatILTime(s.endTime)}</span>
-      </td>
-      <td class="inv-num">${fmtHours(ms)}</td>
-      <td class="inv-num">${rateLabel}</td>
-      <td class="inv-num">${amount !== null ? fmtMoney(amount) : '—'}</td>
-    </tr>`;
-  });
+  let bodyRows = [];
 
-  if (model === 'project') {
-    subtotal = rate;
-    bodyRows.push(`<tr>
-      <td class="inv-num">${matched.length + 1}</td>
-      <td></td>
-      <td><span class="inv-row-desc">מחיר פרויקט — ${esc(customer)}</span></td>
-      <td></td><td></td>
-      <td class="inv-num">${fmtMoney(rate)}</td>
-    </tr>`);
+  if (reportType === 'per_date') {
+    // Group sessions by calendar date, sum hours, concatenate descriptions
+    const byDate = {};
+    for (const s of matched) {
+      const key = formatILDateInput(s.startTime);
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push(s);
+    }
+    const dateKeys = Object.keys(byDate).sort();
+    bodyRows = dateKeys.map((dateKey, i) => {
+      const group = byDate[dateKey];
+      const ms = group.reduce((sum, s) => sum + durationMs(s.startTime, s.endTime, s.breaks), 0);
+      totalMs += ms;
+      let amount = null;
+      if (model === 'per_hour') amount = rate * (ms / 3600000);
+      if (model === 'per_day')  amount = rate * (ms / 3600000 / 7);
+      if (amount !== null) subtotal += amount;
+      const rawDesc = group.map(s => s.notes).filter(Boolean).join(' ; ') || 'שירותי ייעוץ';
+      return `<tr>
+        <td class="inv-num">${i + 1}</td>
+        <td class="inv-num">${heDate(dateKey + 'T12:00:00Z')}</td>
+        <td>
+          <span class="inv-row-desc inv-desc-edit" contenteditable="true">${esc(rawDesc)}</span>
+        </td>
+        <td class="inv-num">${fmtHours(ms)}</td>
+        <td class="inv-num">${rateLabel}</td>
+        <td class="inv-num">${amount !== null ? fmtMoney(amount) : '—'}</td>
+      </tr>`;
+    });
+    if (model === 'project') {
+      subtotal = rate;
+      bodyRows.push(`<tr>
+        <td class="inv-num">${dateKeys.length + 1}</td>
+        <td></td>
+        <td><span class="inv-row-desc">מחיר פרויקט — ${esc(customer)}</span></td>
+        <td></td><td></td>
+        <td class="inv-num">${fmtMoney(rate)}</td>
+      </tr>`);
+    }
+  } else {
+    // Per session (original behaviour)
+    bodyRows = matched.map((s, i) => {
+      const ms = durationMs(s.startTime, s.endTime, s.breaks);
+      totalMs += ms;
+      let amount = null;
+      if (model === 'per_hour') amount = rate * (ms / 3600000);
+      if (model === 'per_day')  amount = rate * (ms / 3600000 / 7);
+      if (amount !== null) subtotal += amount;
+      return `<tr>
+        <td class="inv-num">${i + 1}</td>
+        <td class="inv-num">${heDate(s.startTime)}</td>
+        <td>
+          <span class="inv-row-desc">${esc(s.notes || 'שירותי ייעוץ')}</span>
+          <span class="inv-row-time">${formatILTime(s.startTime)}–${formatILTime(s.endTime)}</span>
+        </td>
+        <td class="inv-num">${fmtHours(ms)}</td>
+        <td class="inv-num">${rateLabel}</td>
+        <td class="inv-num">${amount !== null ? fmtMoney(amount) : '—'}</td>
+      </tr>`;
+    });
+    if (model === 'project') {
+      subtotal = rate;
+      bodyRows.push(`<tr>
+        <td class="inv-num">${matched.length + 1}</td>
+        <td></td>
+        <td><span class="inv-row-desc">מחיר פרויקט — ${esc(customer)}</span></td>
+        <td></td><td></td>
+        <td class="inv-num">${fmtMoney(rate)}</td>
+      </tr>`);
+    }
   }
 
   const vat   = subtotal * VAT_RATE;
@@ -1758,8 +1858,8 @@ function generateReport() {
       .filter(Boolean).join(' · '),
   ].filter(Boolean).map(l => `<div class="inv-biz-line">${l}</div>`).join('');
 
-  const periodFrom = from ? heDate(from + 'T12:00:00') : heDate(matched[0].startTime);
-  const periodTo   = to   ? heDate(to + 'T12:00:00')   : heDate(matched[matched.length - 1].startTime);
+  const periodFrom = from ? heDate(from + 'T12:00:00Z') : heDate(matched[0].startTime);
+  const periodTo   = to   ? heDate(to + 'T12:00:00Z')   : heDate(matched[matched.length - 1].startTime);
 
   container.innerHTML = `<div class="invoice-doc" id="invoice-doc">
     <div class="inv-top">
@@ -1801,6 +1901,21 @@ function generateReport() {
   </div>`;
 
   printBtn.style.display = 'flex';
+  dlBtn.style.display = 'flex';
+}
+
+function downloadPdf() {
+  const element = document.getElementById('invoice-doc');
+  if (!element) return;
+  const customer = document.getElementById('report-customer').value || 'invoice';
+  const docNum   = document.getElementById('report-number').value.trim() || 'invoice';
+  html2pdf().set({
+    margin: 10,
+    filename: `${customer}-${docNum}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  }).from(element).save();
 }
 
 // ── START SESSION ──
@@ -2013,25 +2128,30 @@ function updateBreak(i, field, val) {
 }
 
 function saveEdit() {
-  const id = document.getElementById('edit-session-id').value;
-  const s  = sessions.find(x => x.id === id);
-  if (!s) return;
-  const customer = document.getElementById('edit-customer').value.trim();
-  if (!customer) { showConfirm('Client name is required.', 'OK', ()=>{}); return; }
-  const sd = document.getElementById('edit-start-date').value;
-  const st = document.getElementById('edit-start-time').value;
-  if (!sd || !st) { showConfirm('Start date and time are required.', 'OK', ()=>{}); return; }
-  s.customer  = customer;
-  s.startTime = localInputToISO(sd, st);
-  const ed = document.getElementById('edit-end-date').value;
-  const et = document.getElementById('edit-end-time').value;
-  if (ed && et) s.endTime = localInputToISO(ed, et);
-  s.notes  = document.getElementById('edit-notes').value.trim();
-  s.breaks = editBreaks.filter(b => b.start && b.end);
-  save();
-  upsertSession(s);
-  closeModal('modal-edit');
-  render();
+  try {
+    const id = document.getElementById('edit-session-id').value;
+    const s  = sessions.find(x => x.id === id);
+    if (!s) { showConfirm('Session not found — please close and reopen.', 'OK', ()=>{}); return; }
+    const customer = document.getElementById('edit-customer').value.trim();
+    if (!customer) { showConfirm('Client name is required.', 'OK', ()=>{}); return; }
+    const sd = document.getElementById('edit-start-date').value;
+    const st = document.getElementById('edit-start-time').value;
+    if (!sd || !st) { showConfirm('Start date and time are required.', 'OK', ()=>{}); return; }
+    s.customer  = customer;
+    s.startTime = localInputToISO(sd, st);
+    const ed = document.getElementById('edit-end-date').value;
+    const et = document.getElementById('edit-end-time').value;
+    if (ed && et) s.endTime = localInputToISO(ed, et);
+    s.notes  = document.getElementById('edit-notes').value.trim();
+    s.breaks = editBreaks.filter(b => b.start && b.end);
+    save();
+    upsertSession(s);
+    closeModal('modal-edit');
+    render();
+  } catch (e) {
+    console.error('saveEdit failed', e);
+    showConfirm('Could not save — ' + (e.message || 'unknown error'), 'OK', ()=>{});
+  }
 }
 
 // ── MODAL ──
