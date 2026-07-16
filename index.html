@@ -1612,6 +1612,62 @@ function renderActiveCards() {
   }).join('');
 }
 
+// ── JOB % METRIC ──
+// 100% = 8h on a working day (Sun–Thu). Can exceed 100%.
+const WORK_HOURS_PER_DAY = 8;
+
+// Parse a local YYYY-MM-DD string into a local Date (midnight).
+function parseLocalDate(ymd) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Count Sun–Thu days between two local Dates (inclusive).
+function countWorkingDays(start, end) {
+  let count = 0;
+  const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  while (cur <= last) {
+    const day = cur.getDay(); // 0=Sun … 6=Sat
+    if (day !== 5 && day !== 6) count++; // exclude Fri & Sat
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+// Resolve the working-day range for the active history filter.
+// Returns {start, end} local Dates, or null if not determinable.
+function filterDateRange(filterValue, doneSessions) {
+  const todayYmd = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+  const today    = parseLocalDate(todayYmd);
+  if (filterValue === 'today') return { start: today, end: today };
+  if (filterValue === 'all') {
+    if (!doneSessions.length) return null;
+    const earliest = doneSessions.reduce((min, s) => {
+      const d = new Date(s.startTime).toLocaleDateString('en-CA', { timeZone: TZ });
+      return d < min ? d : min;
+    }, todayYmd);
+    return { start: parseLocalDate(earliest), end: today };
+  }
+  // Specific month: YYYY-MM
+  const [fy, fm] = filterValue.split('-').map(Number);
+  const start = new Date(fy, fm - 1, 1);
+  let end = new Date(fy, fm, 0); // last day of month
+  if (end > today) end = today;  // don't count future days in the current month
+  if (start > today) return { start, end: start, future: true };
+  return { start, end };
+}
+
+function calcJobPercent(doneSessions, filterValue) {
+  const range = filterDateRange(filterValue, doneSessions);
+  if (!range || range.future) return null;
+  const workingDays = countWorkingDays(range.start, range.end);
+  if (workingDays <= 0) return null;
+  const totalMs = doneSessions.reduce((acc, s) => acc + durationMs(s.startTime, s.endTime, s.breaks), 0);
+  const totalH  = totalMs / 3600000;
+  return Math.round((totalH / (workingDays * WORK_HOURS_PER_DAY)) * 100);
+}
+
 function renderHistory() {
   const filter   = getSelectedMonthFilter();
   const psFilter = getSelectedPaymentFilter();
@@ -1628,6 +1684,7 @@ function renderHistory() {
     const totalH  = (totalMs / 3600000).toFixed(1);
     const earnings = Math.round(calcTotalEarnings(done)).toLocaleString('he-IL');
     const clients = new Set(done.map(s => s.customer)).size;
+    const jobPct  = calcJobPercent(done, filter);
     bar.innerHTML = `<div class="summary-bar">
       <div><div class="stat-val">${done.length}</div><div class="stat-lbl">Sessions</div></div>
       <div class="stat-divider"></div>
@@ -1637,6 +1694,8 @@ function renderHistory() {
       </div>
       <div class="stat-divider"></div>
       <div><div class="stat-val">${clients}</div><div class="stat-lbl">Clients</div></div>
+      <div class="stat-divider"></div>
+      <div><div class="stat-val">${jobPct === null ? '—' : jobPct + '%'}</div><div class="stat-lbl" title="Hours worked vs. 8h × working days (Sun–Thu)">Job %</div></div>
     </div>`;
   } else {
     bar.innerHTML = '';
