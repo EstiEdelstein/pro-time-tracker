@@ -459,6 +459,7 @@
     .desktop-only { display: none !important; }
     @media (min-width: 768px) {
       .tab-btn.desktop-only { display: flex !important; }
+      .filter-row.desktop-only { display: flex !important; }
       body.reports-mode { max-width: 920px; }
     }
     @media (max-width: 767px) {
@@ -680,6 +681,11 @@
           <option value="invoice_not_sent">Not Invoiced</option>
           <option value="invoice_sent">Invoice Sent</option>
           <option value="paid">Paid</option>
+        </select>
+      </div>
+      <div class="filter-row desktop-only">
+        <select class="filter-select" id="client-filter" onchange="renderHistory()">
+          <option value="all">All Clients</option>
         </select>
       </div>
       <div id="summary-bar-container"></div>
@@ -1364,6 +1370,33 @@ function getSelectedPaymentFilter() {
   return document.getElementById('payment-filter').value;
 }
 
+// ── CLIENT FILTER (desktop only) ──
+// Rebuild the options from the clients that actually appear in history,
+// preserving the current selection. Skipped while the select is focused so
+// re-rendering mid-interaction doesn't yank the dropdown out from under it.
+function buildClientOptions() {
+  const sel = document.getElementById('client-filter');
+  if (!sel || document.activeElement === sel) return;
+  const current = sel.value || 'all';
+  const names = [...new Set(sessions.filter(s => s.endTime && s.customer).map(s => s.customer))]
+    .sort((a, b) => a.localeCompare(b, 'he'));
+  sel.innerHTML = '<option value="all">All Clients</option>'
+    + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  // Selection survives only if that client still has sessions.
+  sel.value = names.includes(current) ? current : 'all';
+}
+
+// Must match the .filter-row.desktop-only breakpoint in the stylesheet.
+const DESKTOP_MQ = '(min-width: 768px)';
+
+// Returns 'all' on narrow viewports, where the select is hidden — so a
+// selection made on desktop can never silently filter the mobile view.
+function getSelectedClientFilter() {
+  const sel = document.getElementById('client-filter');
+  if (!sel || !matchMedia(DESKTOP_MQ).matches) return 'all';
+  return sel.value;
+}
+
 function setPaymentStatus(id, status, paidAt) {
   const s = sessions.find(x => x.id === id);
   if (!s) return;
@@ -1669,11 +1702,14 @@ function calcJobPercent(doneSessions, filterValue) {
 }
 
 function renderHistory() {
+  buildClientOptions();
   const filter   = getSelectedMonthFilter();
   const psFilter = getSelectedPaymentFilter();
+  const clFilter = getSelectedClientFilter();
   const done     = sessions
     .filter(s => s.endTime && sessionMatchesFilter(s, filter))
     .filter(s => psFilter === 'all' || (s.paymentStatus || 'invoice_not_sent') === psFilter)
+    .filter(s => clFilter === 'all' || s.customer === clFilter)
     .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
 
   const el  = document.getElementById('history-list');
