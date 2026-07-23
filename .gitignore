@@ -1,2 +1,7 @@
 .DS_Store
 node_modules/
+
+# Playwright E2E artifacts
+tests/playwright-report/
+tests/test-results/
+tests/.last-run.json
